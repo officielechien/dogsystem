@@ -149,21 +149,26 @@ function stationLabel(stopId) {
 }
 
 function extractTrainNumber(rawTripId) {
-  // Priorité 1 : la vraie correspondance officielle venant des données Static.
-  const staticTripId = String(rawTripId).replace(/^gt:nmbssncb:/, '');
-  if (trainNumbers[staticTripId]) {
-    return trainNumbers[staticTripId];
+  const id = String(rawTripId);
+
+  // Correspondance exacte
+  if (trainNumbers[id]) return trainNumbers[id];
+
+  // Correspondance tolérante : les deux identifiants peuvent différer légèrement
+  // (un segment en plus ou en moins à la fin selon la source des données).
+  for (const key in trainNumbers) {
+    if (key.startsWith(id) || id.startsWith(key)) {
+      return trainNumbers[key];
+    }
   }
-  if (trainNumbers[rawTripId]) {
-    return trainNumbers[rawTripId];
-  }
-  // Repli : ancienne méthode (moins fiable) si aucune correspondance trouvée.
-  const parts = String(rawTripId).split(':');
+
+  // Repli si vraiment aucune correspondance : ancienne extraction approximative.
+  const parts = id.split(':');
   const maybeNumber = parts[parts.length - 2];
   if (maybeNumber && /^\d+$/.test(maybeNumber)) {
     return maybeNumber;
   }
-  return rawTripId;
+  return id;
 }
 
 async function loadTripUpdates() {
