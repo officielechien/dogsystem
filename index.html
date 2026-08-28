@@ -120,9 +120,10 @@
 <footer>DOGSYSTEM · DONNÉES EN DIRECT : SNCB / BELGIAN MOBILITY COMPANY</footer>
 
 <script>
-let stationNames = {};   // stop_id -> nom de la gare
-let trainNumbers = {};   // trip_id (static) -> vrai numéro de train
-let allRows = [];        // toutes les lignes construites depuis le flux temps réel
+let stationNames = {};      // stop_id -> nom de la gare
+let trainNumbers = {};      // trip_id (static, exact) -> vrai numéro de train
+let trainNumbersByPrefix = {}; // trip_id (static, sans le dernier segment) -> vrai numéro de train
+let allRows = [];
 
 async function loadStations() {
   try {
@@ -138,7 +139,17 @@ async function loadTrips() {
   try {
     const res = await fetch('/api/trips');
     const data = await res.json();
-    if (res.ok) trainNumbers = data;
+    if (res.ok) {
+      trainNumbers = data;
+      trainNumbersByPrefix = {};
+      for (const key in trainNumbers) {
+        const lastColon = key.lastIndexOf(':');
+        if (lastColon > -1) {
+          const trimmedKey = key.substring(0, lastColon);
+          trainNumbersByPrefix[trimmedKey] = trainNumbers[key];
+        }
+      }
+    }
   } catch (err) {
     console.error('Erreur chargement des numéros de train', err);
   }
@@ -154,13 +165,9 @@ function extractTrainNumber(rawTripId) {
   // Correspondance exacte
   if (trainNumbers[id]) return trainNumbers[id];
 
-  // Correspondance tolérante : les deux identifiants peuvent différer légèrement
-  // (un segment en plus ou en moins à la fin selon la source des données).
-  for (const key in trainNumbers) {
-    if (key.startsWith(id) || id.startsWith(key)) {
-      return trainNumbers[key];
-    }
-  }
+  // Correspondance précise : la version officielle a le même identifiant,
+  // avec juste un segment technique en plus tout à la fin (ex: ":2").
+  if (trainNumbersByPrefix[id]) return trainNumbersByPrefix[id];
 
   // Repli si vraiment aucune correspondance : ancienne extraction approximative.
   const parts = id.split(':');
