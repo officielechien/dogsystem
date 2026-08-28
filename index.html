@@ -121,6 +121,7 @@
 
 <script>
 let stationNames = {};   // stop_id -> nom de la gare
+let trainNumbers = {};   // trip_id (static) -> vrai numéro de train
 let allRows = [];        // toutes les lignes construites depuis le flux temps réel
 
 async function loadStations() {
@@ -133,19 +134,36 @@ async function loadStations() {
   }
 }
 
+async function loadTrips() {
+  try {
+    const res = await fetch('/api/trips');
+    const data = await res.json();
+    if (res.ok) trainNumbers = data;
+  } catch (err) {
+    console.error('Erreur chargement des numéros de train', err);
+  }
+}
+
 function stationLabel(stopId) {
   return stationNames[stopId] || stopId || '—';
 }
 
-function extractTrainNumber(tripId) {
-  // Format observé : gt:nmbssncb:ROUTE:...::ORIGINE:DESTINATION:XX:NUMERO:DATE
-  // Le numéro de train se trouve juste avant la date (8 chiffres) à la fin.
-  const parts = String(tripId).split(':');
+function extractTrainNumber(rawTripId) {
+  // Priorité 1 : la vraie correspondance officielle venant des données Static.
+  const staticTripId = String(rawTripId).replace(/^gt:nmbssncb:/, '');
+  if (trainNumbers[staticTripId]) {
+    return trainNumbers[staticTripId];
+  }
+  if (trainNumbers[rawTripId]) {
+    return trainNumbers[rawTripId];
+  }
+  // Repli : ancienne méthode (moins fiable) si aucune correspondance trouvée.
+  const parts = String(rawTripId).split(':');
   const maybeNumber = parts[parts.length - 2];
   if (maybeNumber && /^\d+$/.test(maybeNumber)) {
     return maybeNumber;
   }
-  return tripId;
+  return rawTripId;
 }
 
 async function loadTripUpdates() {
@@ -227,6 +245,7 @@ document.getElementById('searchInput').addEventListener('input', renderTable);
 
 async function init() {
   await loadStations();
+  await loadTrips();
   await loadTripUpdates();
   setInterval(loadTripUpdates, 30000);
 }
