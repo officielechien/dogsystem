@@ -84,7 +84,7 @@
     <h1>DOG<span>SYSTEM</span></h1>
     <p class="tagline">Position des trains, horaires et retards en temps réel.</p>
     <div class="search-bar">
-      <input type="text" id="searchInput" placeholder="Rechercher une gare (ex: Bruxelles, Namur…)" />
+      <input type="text" id="searchInput" placeholder="Rechercher une gare ou un numéro de train…" />
     </div>
   </div>
 </section>
@@ -108,7 +108,7 @@
   <div class="panel-title" id="tableTitle">Prochains passages en direct</div>
   <table>
     <thead>
-      <tr><th>Gare</th><th>Trajet</th><th>Retard</th></tr>
+      <tr><th>Gare</th><th>N° Train</th><th>Retard</th></tr>
     </thead>
     <tbody id="tripTableBody">
       <tr><td colspan="3" style="color:var(--text-dim);">Chargement…</td></tr>
@@ -137,6 +137,17 @@ function stationLabel(stopId) {
   return stationNames[stopId] || stopId || '—';
 }
 
+function extractTrainNumber(tripId) {
+  // Format observé : gt:nmbssncb:ROUTE:...::ORIGINE:DESTINATION:XX:NUMERO:DATE
+  // Le numéro de train se trouve juste avant la date (8 chiffres) à la fin.
+  const parts = String(tripId).split(':');
+  const maybeNumber = parts[parts.length - 2];
+  if (maybeNumber && /^\d+$/.test(maybeNumber)) {
+    return maybeNumber;
+  }
+  return tripId;
+}
+
 async function loadTripUpdates() {
   const dot = document.getElementById('statusDot');
   const title = document.getElementById('statusTitle');
@@ -155,7 +166,8 @@ async function loadTripUpdates() {
       const tu = e.trip_update || e.tripUpdate;
       if (!tu) return;
       const trip = tu.trip || {};
-      const tripId = trip.trip_id || trip.tripId || '—';
+      const rawTripId = trip.trip_id || trip.tripId || '—';
+      const tripId = extractTrainNumber(rawTripId);
       const stopUpdates = tu.stop_time_update || tu.stopTimeUpdate || [];
       stopUpdates.forEach(stu => {
         const stopId = stu.stop_id || stu.stopId || '—';
@@ -186,7 +198,10 @@ function renderTable() {
 
   let rows = allRows;
   if (query) {
-    rows = rows.filter(r => stationLabel(r.stopId).toLowerCase().includes(query));
+    rows = rows.filter(r =>
+      stationLabel(r.stopId).toLowerCase().includes(query) ||
+      String(r.tripId).toLowerCase().includes(query)
+    );
   }
 
   count.firstChild.textContent = rows.length;
