@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DOGSYSTEM — Suivi des trains en temps réel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0a0a0b;
+    --bg-panel: #141416;
+    --rail: #b31217;
+    --rail-bright: #ff3b3b;
+    --text: #f2f0ed;
+    --text-dim: #8a8a8e;
+    --ok: #3ddc84;
+    --warn: #ffb020;
+    --line: #232326;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  ::selection{background:var(--rail);color:#fff;}
+
+  .hero{
+    position:relative;min-height:48vh;display:flex;flex-direction:column;justify-content:center;align-items:center;
+    padding:50px 24px;overflow:hidden;border-bottom:1px solid var(--line);
+  }
+  .rails-svg{position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:0.9;}
+  .rail-line{stroke:var(--rail);stroke-width:2;fill:none;filter:drop-shadow(0 0 6px rgba(179,18,23,0.45));}
+  .hero-content{position:relative;z-index:2;text-align:center;max-width:720px;width:100%;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;letter-spacing:.25em;text-transform:uppercase;font-size:12px;color:var(--rail-bright);margin-bottom:18px;}
+  h1{font-family:'Oswald',sans-serif;font-weight:700;font-size:clamp(38px,8vw,72px);letter-spacing:.03em;margin:0 0 14px;line-height:0.95;text-transform:uppercase;}
+  h1 span{color:var(--rail-bright);}
+  .tagline{color:var(--text-dim);font-size:16px;margin:0 0 30px;line-height:1.5;}
+
+  .search-bar{display:flex;align-items:center;gap:10px;background:var(--bg-panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;max-width:480px;margin:0 auto;transition:border-color .2s;}
+  .search-bar:focus-within{border-color:var(--rail);}
+  .search-bar input{background:none;border:none;outline:none;color:var(--text);font-family:'Inter',sans-serif;font-size:15px;width:100%;}
+  .search-bar input::placeholder{color:var(--text-dim);}
+
+  .wrap{max-width:1000px;margin:0 auto;padding:36px 24px 60px;}
+
+  .status-panel{
+    background:var(--bg-panel);border:1px solid var(--line);border-radius:8px;
+    padding:22px 24px;margin-bottom:28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;
+  }
+  .status-left{display:flex;align-items:center;gap:12px;}
+  .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 2s infinite;}
+  .dot.err{background:var(--rail-bright);box-shadow:0 0 8px var(--rail-bright);}
+  .dot.loading{background:var(--warn);animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .status-title{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:14px;}
+  .status-sub{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);margin-top:2px;}
+  .status-count{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;text-align:right;}
+  .status-count small{display:block;font-size:11px;color:var(--text-dim);font-weight:400;letter-spacing:.05em;}
+
+  .panel-title{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:.08em;font-size:14px;color:var(--text-dim);margin-bottom:16px;}
+
+  table{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:13px;}
+  th{text-align:left;color:var(--text-dim);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+  td{padding:10px;border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  .station-name{font-family:'Inter',sans-serif;font-weight:500;}
+  .delay-ok{color:var(--ok);}
+  .delay-warn{color:var(--warn);}
+  .delay-bad{color:var(--rail-bright);}
+
+  footer{padding:26px 28px;text-align:center;color:var(--text-dim);font-size:12px;font-family:'IBM Plex Mono',monospace;letter-spacing:.03em;border-top:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <svg class="rails-svg" viewBox="0 0 1200 500" preserveAspectRatio="xMidYMid slice">
+    <path class="rail-line" d="M -100 560 L 560 200" />
+    <path class="rail-line" d="M -20 560 L 585 200" />
+    <path class="rail-line" d="M 1300 560 L 640 200" />
+    <path class="rail-line" d="M 1220 560 L 615 200" />
+  </svg>
+  <div class="hero-content">
+    <div class="eyebrow">Réseau ferroviaire belge · En direct</div>
+    <h1>DOG<span>SYSTEM</span></h1>
+    <p class="tagline">Position des trains, horaires et retards en temps réel.</p>
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Rechercher une gare (ex: Bruxelles, Namur…)" />
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+
+  <div class="status-panel">
+    <div class="status-left">
+      <span class="dot loading" id="statusDot"></span>
+      <div>
+        <div class="status-title" id="statusTitle">Connexion à l'API SNCB…</div>
+        <div class="status-sub" id="statusSub">—</div>
+      </div>
+    </div>
+    <div class="status-count">
+      <span id="tripCount">–</span>
+      <small>arrêts affichés</small>
+    </div>
+  </div>
+
+  <div class="panel-title" id="tableTitle">Prochains passages en direct</div>
+  <table>
+    <thead>
+      <tr><th>Gare</th><th>Trajet</th><th>Retard</th></tr>
+    </thead>
+    <tbody id="tripTableBody">
+      <tr><td colspan="3" style="color:var(--text-dim);">Chargement…</td></tr>
+    </tbody>
+  </table>
+
+</div>
+
+<footer>DOGSYSTEM · DONNÉES EN DIRECT : SNCB / BELGIAN MOBILITY COMPANY</footer>
+
+<script>
+let stationNames = {};   // stop_id -> nom de la gare
+let allRows = [];        // toutes les lignes construites depuis le flux temps réel
+
+async function loadStations() {
+  try {
+    const res = await fetch('/api/stations');
+    const data = await res.json();
+    if (res.ok) stationNames = data;
+  } catch (err) {
+    console.error('Erreur chargement des gares', err);
+  }
+}
+
+function stationLabel(stopId) {
+  return stationNames[stopId] || stopId || '—';
+}
+
+async function loadTripUpdates() {
+  const dot = document.getElementById('statusDot');
+  const title = document.getElementById('statusTitle');
+  const sub = document.getElementById('statusSub');
+  const tbody = document.getElementById('tripTableBody');
+
+  try {
+    const res = await fetch('/api/trip-updates');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erreur inconnue');
+
+    const entities = data.entity || [];
+    allRows = [];
+
+    entities.forEach(e => {
+      const tu = e.trip_update;
+      if (!tu) return;
+      const tripId = (tu.trip && tu.trip.trip_id) || '—';
+      const stopUpdates = tu.stop_time_update || [];
+      stopUpdates.forEach(stu => {
+        const stopId = stu.stop_id || '—';
+        const delaySec = (stu.arrival && stu.arrival.delay) ?? (stu.departure && stu.departure.delay) ?? 0;
+        allRows.push({ tripId, stopId, delayMin: Math.round(delaySec / 60) });
+      });
+    });
+
+    dot.className = 'dot ok';
+    title.textContent = 'Connecté — flux en direct';
+    sub.textContent = 'Dernière mise à jour : ' + new Date().toLocaleTimeString('fr-BE');
+
+    renderTable();
+  } catch (err) {
+    dot.className = 'dot err';
+    title.textContent = 'Connexion impossible';
+    sub.textContent = String(err.message || err);
+    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--rail-bright);">Erreur de chargement.</td></tr>';
+  }
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tripTableBody');
+  const count = document.getElementById('tripCount');
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  let rows = allRows;
+  if (query) {
+    rows = rows.filter(r => stationLabel(r.stopId).toLowerCase().includes(query));
+  }
+
+  count.firstChild.textContent = rows.length;
+  tbody.innerHTML = '';
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-dim);">Aucun résultat pour cette recherche.</td></tr>';
+    return;
+  }
+
+  rows.slice(0, 40).forEach(r => {
+    let delayClass = 'delay-ok', delayLabel = "À l'heure";
+    if (r.delayMin > 0 && r.delayMin <= 5) { delayClass = 'delay-warn'; delayLabel = '+' + r.delayMin + ' min'; }
+    else if (r.delayMin > 5) { delayClass = 'delay-bad'; delayLabel = '+' + r.delayMin + ' min'; }
+
+    const row = document.createElement('tr');
+    row.innerHTML = `<td class="station-name">${stationLabel(r.stopId)}</td><td>${r.tripId}</td><td class="${delayClass}">${delayLabel}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
+document.getElementById('searchInput').addEventListener('input', renderTable);
+
+async function init() {
+  await loadStations();
+  await loadTripUpdates();
+  setInterval(loadTripUpdates, 30000);
+}
+init();
+</script>
+
+</body>
+</html>

@@ -2,5 +2,8 @@
   "name": "dogsystem",
   "version": "1.0.0",
   "private": true,
-  "description": "DOGSYSTEM — suivi des trains en temps réel (Belgique)"
+  "description": "DOGSYSTEM — suivi des trains en temps réel (Belgique)",
+  "dependencies": {
+    "jszip": "^3.10.1"
+  }
 }

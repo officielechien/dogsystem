@@ -32,10 +32,16 @@ Si tu as déjà ajouté la clé API avant de déployer, tout doit fonctionner di
 Si tu l'ajoutes après coup, il faut relancer un déploiement (**Deployments** → **⋯** → **Redeploy**).
 
 ## Structure du projet
-- `/public/index.html` — le site (design + affichage)
-- `/api/trip-updates.js` — la fonction serveur qui va chercher les données SNCB en cachant la clé API
+- `/index.html` — le site (design + affichage), à la racine
+- `/api/trip-updates.js` — récupère les retards en temps réel (cache la clé API)
+- `/api/stations.js` — récupère la liste des gares (Static) pour afficher de vrais noms
 - `.env.example` — modèle pour tester en local (ne contient jamais la vraie clé)
 
+## Mettre à jour le site après une modification
+Si tu remplaces des fichiers existants (comme aujourd'hui), utilise à nouveau
+**"Add file" → "Upload files"** sur GitHub, glisse tous les fichiers du dossier,
+puis **"Commit changes"**. GitHub écrase automatiquement les anciennes versions,
+et Vercel redéploie tout seul en 30-60 secondes.
+
 ## Prochaine étape
-Brancher l'API **Static** (liste des gares et lignes) pour remplacer les codes techniques
-(`trip_id`, `stop_id`) actuellement affichés par de vrais noms de gares.
+Ajouter une carte interactive et enrichir la recherche (par ligne, par numéro de train).
