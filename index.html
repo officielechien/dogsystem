@@ -152,13 +152,16 @@ async function loadTripUpdates() {
     allRows = [];
 
     entities.forEach(e => {
-      const tu = e.trip_update;
+      const tu = e.trip_update || e.tripUpdate;
       if (!tu) return;
-      const tripId = (tu.trip && tu.trip.trip_id) || '—';
-      const stopUpdates = tu.stop_time_update || [];
+      const trip = tu.trip || {};
+      const tripId = trip.trip_id || trip.tripId || '—';
+      const stopUpdates = tu.stop_time_update || tu.stopTimeUpdate || [];
       stopUpdates.forEach(stu => {
-        const stopId = stu.stop_id || '—';
-        const delaySec = (stu.arrival && stu.arrival.delay) ?? (stu.departure && stu.departure.delay) ?? 0;
+        const stopId = stu.stop_id || stu.stopId || '—';
+        const arrival = stu.arrival || {};
+        const departure = stu.departure || {};
+        const delaySec = arrival.delay ?? departure.delay ?? 0;
         allRows.push({ tripId, stopId, delayMin: Math.round(delaySec / 60) });
       });
     });
