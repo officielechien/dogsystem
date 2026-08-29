@@ -72,6 +72,15 @@
 
   #map{width:100%;height:360px;border-radius:6px;border:1px solid var(--line);margin-bottom:24px;filter:grayscale(0.15) contrast(1.05);}
 
+  .composition-panel{background:var(--bg-panel);border:1px solid var(--line);border-radius:8px;padding:18px;margin-top:24px;}
+  .composition-units{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .unit-card{
+    background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px 14px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;min-width:110px;
+  }
+  .unit-card .num{font-size:15px;font-weight:600;color:var(--rail-bright);}
+  .unit-card .type{color:var(--text-dim);margin-top:2px;}
+
   .back-link{
     display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);
     text-decoration:none;margin-bottom:16px;cursor:pointer;
@@ -312,6 +321,37 @@ function gtfsTimeToUnix(hms, referenceDate) {
   return d.getTime() / 1000;
 }
 
+async function loadComposition(trainNumber) {
+  const panel = document.getElementById('compositionPanel');
+  if (!panel) return;
+
+  try {
+    const res = await fetch('/api/composition?number=' + encodeURIComponent(trainNumber));
+    const data = await res.json();
+
+    if (!res.ok || !data.units || data.units.length === 0) {
+      panel.innerHTML = `<div class="panel-title" style="margin-bottom:8px;">Composition du train</div>
+        <div style="color:var(--text-dim);font-size:12px;">${data.error || 'Composition non disponible pour ce train.'}</div>`;
+      return;
+    }
+
+    let html = `<div class="panel-title" style="margin-bottom:8px;">Composition du train — ${data.units.length} voiture(s)</div>`;
+    html += `<div class="composition-units">`;
+    data.units.forEach(u => {
+      html += `<div class="unit-card">
+        <div class="num">n° ${u.materialNumber || '—'}</div>
+        <div class="type">${u.type || 'Type inconnu'}</div>
+        <div class="type">${u.seatsFirstClass}× 1ère · ${u.seatsSecondClass}× 2nde</div>
+        ${u.hasBikeSection ? '<div class="type">🚲 Espace vélos</div>' : ''}
+      </div>`;
+    });
+    html += `</div>`;
+    panel.innerHTML = html;
+  } catch (err) {
+    panel.innerHTML = `<div style="color:var(--text-dim);font-size:12px;">Composition indisponible pour le moment.</div>`;
+  }
+}
+
 async function renderScheduledTrainView(trainNumber, area) {
   area.innerHTML = `<div class="panel-title">Recherche de l'horaire du train ${trainNumber}…</div>`;
   try {
@@ -391,7 +431,10 @@ function renderTrainView(trainNumber, rows, area, isScheduleOnly) {
   });
 
   html += `</tbody></table>`;
+  html += `<div class="composition-panel" id="compositionPanel"><div class="panel-title" style="margin-bottom:8px;">Composition du train (voitures)</div><div style="color:var(--text-dim);font-size:12px;">Recherche en cours…</div></div>`;
   area.innerHTML = html;
+
+  loadComposition(trainNumber);
 
   // Construction de la carte
   if (leafletMap) { leafletMap.remove(); leafletMap = null; }
