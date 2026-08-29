@@ -106,6 +106,7 @@
   </div>
 
   <div class="panel-title" id="tableTitle">Prochains passages en direct</div>
+  <div id="debugPanel" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--bg-panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:20px;white-space:pre-wrap;"></div>
   <table>
     <thead>
       <tr><th>Gare</th><th>N° Train</th><th>Retard</th></tr>
@@ -162,20 +163,15 @@ function stationLabel(stopId) {
 function extractTrainNumber(rawTripId) {
   const id = String(rawTripId);
 
-  // Correspondance exacte
-  if (trainNumbers[id]) return trainNumbers[id];
+  if (trainNumbers[id]) return { number: trainNumbers[id], matched: true };
+  if (trainNumbersByPrefix[id]) return { number: trainNumbersByPrefix[id], matched: true };
 
-  // Correspondance précise : la version officielle a le même identifiant,
-  // avec juste un segment technique en plus tout à la fin (ex: ":2").
-  if (trainNumbersByPrefix[id]) return trainNumbersByPrefix[id];
-
-  // Repli si vraiment aucune correspondance : ancienne extraction approximative.
   const parts = id.split(':');
   const maybeNumber = parts[parts.length - 2];
   if (maybeNumber && /^\d+$/.test(maybeNumber)) {
-    return maybeNumber;
+    return { number: maybeNumber, matched: false };
   }
-  return id;
+  return { number: id, matched: false };
 }
 
 async function loadTripUpdates() {
@@ -197,14 +193,14 @@ async function loadTripUpdates() {
       if (!tu) return;
       const trip = tu.trip || {};
       const rawTripId = trip.trip_id || trip.tripId || '—';
-      const tripId = extractTrainNumber(rawTripId);
+      const extracted = extractTrainNumber(rawTripId);
       const stopUpdates = tu.stop_time_update || tu.stopTimeUpdate || [];
       stopUpdates.forEach(stu => {
         const stopId = stu.stop_id || stu.stopId || '—';
         const arrival = stu.arrival || {};
         const departure = stu.departure || {};
         const delaySec = arrival.delay ?? departure.delay ?? 0;
-        allRows.push({ tripId, stopId, delayMin: Math.round(delaySec / 60) });
+        allRows.push({ tripId: extracted.number, rawTripId, matched: extracted.matched, stopId, delayMin: Math.round(delaySec / 60) });
       });
     });
 
@@ -259,6 +255,16 @@ async function init() {
   await loadStations();
   await loadTrips();
   await loadTripUpdates();
+
+  // Diagnostic temporaire affiché directement sur la page.
+  const debugEl = document.getElementById('debugPanel');
+  const staticKeysCount = Object.keys(trainNumbers).length;
+  let debugText = `[Diagnostic] Correspondances chargées : ${staticKeysCount}\n\n`;
+  allRows.slice(0, 3).forEach((r, i) => {
+    debugText += `Exemple ${i + 1} — brut: ${r.rawTripId}\n  → trouvé: ${r.matched ? 'OUI (' + r.tripId + ')' : 'NON (repli: ' + r.tripId + ')'}\n\n`;
+  });
+  debugEl.textContent = debugText;
+
   setInterval(loadTripUpdates, 30000);
 }
 init();
