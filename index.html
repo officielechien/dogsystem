@@ -6,6 +6,7 @@
 <title>DOGSYSTEM — Suivi des trains en temps réel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   :root{
     --bg: #0a0a0b;
@@ -23,7 +24,7 @@
   ::selection{background:var(--rail);color:#fff;}
 
   .hero{
-    position:relative;min-height:48vh;display:flex;flex-direction:column;justify-content:center;align-items:center;
+    position:relative;min-height:44vh;display:flex;flex-direction:column;justify-content:center;align-items:center;
     padding:50px 24px;overflow:hidden;border-bottom:1px solid var(--line);
   }
   .rails-svg{position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:0.9;}
@@ -62,10 +63,20 @@
   th{text-align:left;color:var(--text-dim);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
   td{padding:10px;border-bottom:1px solid var(--line);}
   tr:last-child td{border-bottom:none;}
+  tr.passed{opacity:0.45;}
+  tr.current td:first-child{color:var(--rail-bright);font-weight:600;}
   .station-name{font-family:'Inter',sans-serif;font-weight:500;}
   .delay-ok{color:var(--ok);}
   .delay-warn{color:var(--warn);}
   .delay-bad{color:var(--rail-bright);}
+
+  #map{width:100%;height:360px;border-radius:6px;border:1px solid var(--line);margin-bottom:24px;filter:grayscale(0.15) contrast(1.05);}
+
+  .back-link{
+    display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);
+    text-decoration:none;margin-bottom:16px;cursor:pointer;
+  }
+  .back-link:hover{color:var(--rail-bright);}
 
   footer{padding:26px 28px;text-align:center;color:var(--text-dim);font-size:12px;font-family:'IBM Plex Mono',monospace;letter-spacing:.03em;border-top:1px solid var(--line);}
 </style>
@@ -82,9 +93,9 @@
   <div class="hero-content">
     <div class="eyebrow">Réseau ferroviaire belge · En direct</div>
     <h1>DOG<span>SYSTEM</span></h1>
-    <p class="tagline">Position des trains, horaires et retards en temps réel.</p>
+    <p class="tagline">Tapez un numéro de train pour voir sa position en direct, ou une gare pour voir les prochains passages.</p>
     <div class="search-bar">
-      <input type="text" id="searchInput" placeholder="Rechercher une gare ou un numéro de train…" />
+      <input type="text" id="searchInput" placeholder="Ex: 517, ou Bruxelles-Central…" />
     </div>
   </div>
 </section>
@@ -101,36 +112,31 @@
     </div>
     <div class="status-count">
       <span id="tripCount">–</span>
-      <small>arrêts affichés</small>
+      <small id="tripCountLabel">arrêts en direct</small>
     </div>
   </div>
 
-  <div class="panel-title" id="tableTitle">Prochains passages en direct</div>
-  <div id="debugPanel" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--bg-panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:20px;white-space:pre-wrap;"></div>
-  <table>
-    <thead>
-      <tr><th>Gare</th><th>N° Train</th><th>Retard</th></tr>
-    </thead>
-    <tbody id="tripTableBody">
-      <tr><td colspan="3" style="color:var(--text-dim);">Chargement…</td></tr>
-    </tbody>
-  </table>
+  <div id="resultsArea">
+    <div class="panel-title">Chargement des données en direct…</div>
+  </div>
 
 </div>
 
-<footer>DOGSYSTEM · DONNÉES EN DIRECT : SNCB / BELGIAN MOBILITY COMPANY</footer>
+<footer>DOGSYSTEM · DONNÉES EN DIRECT : SNCB / BELGIAN MOBILITY COMPANY · POSITION ESTIMÉE À PARTIR DES HORAIRES, PAS DE GPS RÉEL</footer>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-let stationNames = {};      // stop_id -> nom de la gare
-let trainNumbers = {};      // trip_id (static, exact) -> vrai numéro de train
-let trainNumbersByPrefix = {}; // trip_id (static, sans le dernier segment) -> vrai numéro de train
-let allRows = [];
+let stationInfo = {};        // stop_id -> { name, lat, lon }
+let trainNumbers = {};        // trip_id (static, exact) -> vrai numéro de train
+let trainNumbersByPrefix = {};// trip_id (static, sans le dernier segment) -> vrai numéro de train
+let allRows = [];             // toutes les mises à jour à plat
+let leafletMap = null;
 
 async function loadStations() {
   try {
     const res = await fetch('/api/stations');
     const data = await res.json();
-    if (res.ok) stationNames = data;
+    if (res.ok) stationInfo = data;
   } catch (err) {
     console.error('Erreur chargement des gares', err);
   }
@@ -146,8 +152,7 @@ async function loadTrips() {
       for (const key in trainNumbers) {
         const lastColon = key.lastIndexOf(':');
         if (lastColon > -1) {
-          const trimmedKey = key.substring(0, lastColon);
-          trainNumbersByPrefix[trimmedKey] = trainNumbers[key];
+          trainNumbersByPrefix[key.substring(0, lastColon)] = trainNumbers[key];
         }
       }
     }
@@ -156,21 +161,26 @@ async function loadTrips() {
   }
 }
 
-function stationLabel(stopId) {
-  return stationNames[stopId] || stopId || '—';
+function stationName(stopId) {
+  const s = stationInfo[stopId];
+  return (s && s.name) || stopId || '—';
+}
+
+function stationCoord(stopId) {
+  const s = stationInfo[stopId];
+  if (s && typeof s.lat === 'number' && typeof s.lon === 'number' && !isNaN(s.lat) && !isNaN(s.lon)) {
+    return [s.lat, s.lon];
+  }
+  return null;
 }
 
 function extractTrainNumber(rawTripId) {
   const id = String(rawTripId);
-
   if (trainNumbers[id]) return { number: trainNumbers[id], matched: true };
   if (trainNumbersByPrefix[id]) return { number: trainNumbersByPrefix[id], matched: true };
-
   const parts = id.split(':');
   const maybeNumber = parts[parts.length - 2];
-  if (maybeNumber && /^\d+$/.test(maybeNumber)) {
-    return { number: maybeNumber, matched: false };
-  }
+  if (maybeNumber && /^\d+$/.test(maybeNumber)) return { number: maybeNumber, matched: false };
   return { number: id, matched: false };
 }
 
@@ -178,7 +188,6 @@ async function loadTripUpdates() {
   const dot = document.getElementById('statusDot');
   const title = document.getElementById('statusTitle');
   const sub = document.getElementById('statusSub');
-  const tbody = document.getElementById('tripTableBody');
 
   try {
     const res = await fetch('/api/trip-updates');
@@ -195,12 +204,23 @@ async function loadTripUpdates() {
       const rawTripId = trip.trip_id || trip.tripId || '—';
       const extracted = extractTrainNumber(rawTripId);
       const stopUpdates = tu.stop_time_update || tu.stopTimeUpdate || [];
-      stopUpdates.forEach(stu => {
+
+      stopUpdates.forEach((stu, idx) => {
         const stopId = stu.stop_id || stu.stopId || '—';
         const arrival = stu.arrival || {};
         const departure = stu.departure || {};
         const delaySec = arrival.delay ?? departure.delay ?? 0;
-        allRows.push({ tripId: extracted.number, rawTripId, matched: extracted.matched, stopId, delayMin: Math.round(delaySec / 60) });
+        const time = arrival.time || departure.time || null; // timestamp Unix (secondes)
+        const seq = stu.stop_sequence ?? stu.stopSequence ?? idx;
+
+        allRows.push({
+          tripId: extracted.number,
+          rawTripId,
+          stopId,
+          seq,
+          time,
+          delayMin: Math.round(delaySec / 60)
+        });
       });
     });
 
@@ -208,63 +228,173 @@ async function loadTripUpdates() {
     title.textContent = 'Connecté — flux en direct';
     sub.textContent = 'Dernière mise à jour : ' + new Date().toLocaleTimeString('fr-BE');
 
-    renderTable();
+    render();
   } catch (err) {
     dot.className = 'dot err';
     title.textContent = 'Connexion impossible';
     sub.textContent = String(err.message || err);
-    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--rail-bright);">Erreur de chargement.</td></tr>';
+    document.getElementById('resultsArea').innerHTML =
+      '<div class="panel-title" style="color:var(--rail-bright);">Erreur de chargement.</div>';
   }
 }
 
-function renderTable() {
-  const tbody = document.getElementById('tripTableBody');
-  const count = document.getElementById('tripCount');
-  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+function delayInfo(min) {
+  if (min > 5) return { cls: 'delay-bad', label: '+' + min + ' min' };
+  if (min > 0) return { cls: 'delay-warn', label: '+' + min + ' min' };
+  return { cls: 'delay-ok', label: "À l'heure" };
+}
 
-  let rows = allRows;
-  if (query) {
-    rows = rows.filter(r =>
-      stationLabel(r.stopId).toLowerCase().includes(query) ||
-      String(r.tripId).toLowerCase().includes(query)
-    );
-  }
+function formatTime(unixSeconds) {
+  if (!unixSeconds) return '—';
+  return new Date(unixSeconds * 1000).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
+}
 
-  count.firstChild.textContent = rows.length;
-  tbody.innerHTML = '';
+function render() {
+  const query = document.getElementById('searchInput').value.trim();
+  const queryLower = query.toLowerCase();
+  const countEl = document.getElementById('tripCount');
+  const countLabel = document.getElementById('tripCountLabel');
+  const area = document.getElementById('resultsArea');
 
-  if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-dim);">Aucun résultat pour cette recherche.</td></tr>';
+  const looksLikeTrainNumber = /^\d+$/.test(query);
+  const matchingTrainRows = looksLikeTrainNumber
+    ? allRows.filter(r => String(r.tripId) === query)
+    : [];
+
+  if (looksLikeTrainNumber && matchingTrainRows.length > 0) {
+    countLabel.textContent = 'arrêts sur ce trajet';
+    countEl.firstChild.textContent = matchingTrainRows.length;
+    renderTrainView(query, matchingTrainRows, area);
     return;
   }
 
-  rows.slice(0, 40).forEach(r => {
-    let delayClass = 'delay-ok', delayLabel = "À l'heure";
-    if (r.delayMin > 0 && r.delayMin <= 5) { delayClass = 'delay-warn'; delayLabel = '+' + r.delayMin + ' min'; }
-    else if (r.delayMin > 5) { delayClass = 'delay-bad'; delayLabel = '+' + r.delayMin + ' min'; }
-
-    const row = document.createElement('tr');
-    row.innerHTML = `<td class="station-name">${stationLabel(r.stopId)}</td><td>${r.tripId}</td><td class="${delayClass}">${delayLabel}</td>`;
-    tbody.appendChild(row);
-  });
+  // Sinon : vue liste classique (par gare, ou tout si recherche vide)
+  let rows = allRows;
+  if (queryLower) {
+    rows = rows.filter(r => stationName(r.stopId).toLowerCase().includes(queryLower));
+  }
+  countLabel.textContent = 'arrêts affichés';
+  countEl.firstChild.textContent = rows.length;
+  renderListView(rows, area, looksLikeTrainNumber && query.length > 0);
 }
 
-document.getElementById('searchInput').addEventListener('input', renderTable);
+function renderListView(rows, area, wasTrainSearchWithNoResult) {
+  let html = '<div class="panel-title">Prochains passages en direct</div>';
+
+  if (wasTrainSearchWithNoResult) {
+    html += `<div style="color:var(--text-dim);font-size:13px;margin-bottom:16px;">
+      Aucun train "${document.getElementById('searchInput').value}" actif dans le flux en ce moment
+      (il n'a peut-être pas de retard signalé actuellement, ou ne circule pas maintenant).
+    </div>`;
+  }
+
+  html += `<table><thead><tr><th>Gare</th><th>N° Train</th><th>Retard</th></tr></thead><tbody>`;
+
+  if (rows.length === 0) {
+    html += `<tr><td colspan="3" style="color:var(--text-dim);">Aucun résultat.</td></tr>`;
+  } else {
+    rows.slice(0, 40).forEach(r => {
+      const d = delayInfo(r.delayMin);
+      html += `<tr><td class="station-name">${stationName(r.stopId)}</td><td>${r.tripId}</td><td class="${d.cls}">${d.label}</td></tr>`;
+    });
+  }
+
+  html += `</tbody></table>`;
+  area.innerHTML = html;
+}
+
+function renderTrainView(trainNumber, rows, area) {
+  const sorted = rows.slice().sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+  const now = Date.now() / 1000;
+
+  // Trouve le dernier arrêt déjà passé et le prochain arrêt à venir.
+  let lastPassedIdx = -1;
+  for (let i = 0; i < sorted.length; i++) {
+    if (sorted[i].time && sorted[i].time <= now) lastPassedIdx = i;
+  }
+  const nextIdx = lastPassedIdx + 1 < sorted.length ? lastPassedIdx + 1 : -1;
+
+  // Estime la position actuelle (interpolation entre le dernier arrêt passé et le prochain).
+  let estimatedPos = null;
+  if (lastPassedIdx >= 0 && nextIdx >= 0) {
+    const a = sorted[lastPassedIdx], b = sorted[nextIdx];
+    const coordA = stationCoord(a.stopId), coordB = stationCoord(b.stopId);
+    if (coordA && coordB && a.time && b.time && b.time > a.time) {
+      const fraction = Math.min(1, Math.max(0, (now - a.time) / (b.time - a.time)));
+      estimatedPos = [
+        coordA[0] + (coordB[0] - coordA[0]) * fraction,
+        coordA[1] + (coordB[1] - coordA[1]) * fraction
+      ];
+    } else if (coordA) {
+      estimatedPos = coordA;
+    }
+  } else if (lastPassedIdx >= 0) {
+    estimatedPos = stationCoord(sorted[lastPassedIdx].stopId);
+  } else if (sorted.length > 0) {
+    estimatedPos = stationCoord(sorted[0].stopId);
+  }
+
+  let html = `<a class="back-link" onclick="document.getElementById('searchInput').value='';render();">← Retour à la liste des gares</a>`;
+  html += `<div class="panel-title">Train n° ${trainNumber} — trajet en direct</div>`;
+  html += `<div id="map"></div>`;
+  html += `<table><thead><tr><th>Gare</th><th>Heure</th><th>Retard</th></tr></thead><tbody>`;
+
+  sorted.forEach((r, i) => {
+    const d = delayInfo(r.delayMin);
+    let rowClass = '';
+    if (i <= lastPassedIdx) rowClass = 'passed';
+    else if (i === nextIdx) rowClass = 'current';
+    html += `<tr class="${rowClass}"><td class="station-name">${stationName(r.stopId)}</td><td>${formatTime(r.time)}</td><td class="${d.cls}">${d.label}</td></tr>`;
+  });
+
+  html += `</tbody></table>`;
+  area.innerHTML = html;
+
+  // Construction de la carte
+  if (leafletMap) { leafletMap.remove(); leafletMap = null; }
+  const mapEl = document.getElementById('map');
+  if (!mapEl) return;
+
+  const coords = sorted.map(r => stationCoord(r.stopId)).filter(Boolean);
+  if (coords.length === 0) return;
+
+  leafletMap = L.map('map', { attributionControl: false });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19 }).addTo(leafletMap);
+
+  L.polyline(coords, { color: '#b31217', weight: 3, opacity: 0.7 }).addTo(leafletMap);
+
+  sorted.forEach((r, i) => {
+    const c = stationCoord(r.stopId);
+    if (!c) return;
+    const isPassed = i <= lastPassedIdx;
+    L.circleMarker(c, {
+      radius: 5,
+      color: isPassed ? '#5a5a5e' : '#f2f0ed',
+      fillColor: isPassed ? '#5a5a5e' : '#f2f0ed',
+      fillOpacity: 0.9,
+      weight: 1
+    }).addTo(leafletMap).bindPopup(stationName(r.stopId));
+  });
+
+  if (estimatedPos) {
+    L.circleMarker(estimatedPos, {
+      radius: 9,
+      color: '#ff3b3b',
+      fillColor: '#ff3b3b',
+      fillOpacity: 1,
+      weight: 2
+    }).addTo(leafletMap).bindPopup('Position estimée du train ' + trainNumber);
+  }
+
+  leafletMap.fitBounds(coords, { padding: [30, 30] });
+}
+
+document.getElementById('searchInput').addEventListener('input', render);
 
 async function init() {
   await loadStations();
   await loadTrips();
   await loadTripUpdates();
-
-  // Diagnostic temporaire affiché directement sur la page.
-  const debugEl = document.getElementById('debugPanel');
-  const staticKeysCount = Object.keys(trainNumbers).length;
-  let debugText = `[Diagnostic] Correspondances chargées : ${staticKeysCount}\n\n`;
-  allRows.slice(0, 3).forEach((r, i) => {
-    debugText += `Exemple ${i + 1} — brut: ${r.rawTripId}\n  → trouvé: ${r.matched ? 'OUI (' + r.tripId + ')' : 'NON (repli: ' + r.tripId + ')'}\n\n`;
-  });
-  debugEl.textContent = debugText;
-
   setInterval(loadTripUpdates, 30000);
 }
 init();

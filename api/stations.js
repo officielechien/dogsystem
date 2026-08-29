@@ -56,6 +56,8 @@ function parseStopsCsv(csvText) {
   const headers = parseCsvLine(lines[0]);
   const idIdx = headers.indexOf("stop_id");
   const nameIdx = headers.indexOf("stop_name");
+  const latIdx = headers.indexOf("stop_lat");
+  const lonIdx = headers.indexOf("stop_lon");
 
   const stations = {};
   for (let i = 1; i < lines.length; i++) {
@@ -63,7 +65,11 @@ function parseStopsCsv(csvText) {
     const id = cols[idIdx];
     const name = cols[nameIdx];
     if (!id || !name) continue;
-    stations[id] = name;
+    stations[id] = {
+      name,
+      lat: latIdx >= 0 ? parseFloat(cols[latIdx]) : null,
+      lon: lonIdx >= 0 ? parseFloat(cols[lonIdx]) : null
+    };
   }
   return stations;
 }
