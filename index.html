@@ -264,7 +264,14 @@ function render() {
   if (looksLikeTrainNumber && matchingTrainRows.length > 0) {
     countLabel.textContent = 'arrêts sur ce trajet';
     countEl.firstChild.textContent = matchingTrainRows.length;
-    renderTrainView(query, matchingTrainRows, area);
+    renderTrainView(query, matchingTrainRows, area, false);
+    return;
+  }
+
+  if (looksLikeTrainNumber && query.length > 0) {
+    countLabel.textContent = 'arrêts sur ce trajet';
+    countEl.firstChild.textContent = '–';
+    renderScheduledTrainView(query, area);
     return;
   }
 
@@ -275,19 +282,11 @@ function render() {
   }
   countLabel.textContent = 'arrêts affichés';
   countEl.firstChild.textContent = rows.length;
-  renderListView(rows, area, looksLikeTrainNumber && query.length > 0);
+  renderListView(rows, area);
 }
 
-function renderListView(rows, area, wasTrainSearchWithNoResult) {
+function renderListView(rows, area) {
   let html = '<div class="panel-title">Prochains passages en direct</div>';
-
-  if (wasTrainSearchWithNoResult) {
-    html += `<div style="color:var(--text-dim);font-size:13px;margin-bottom:16px;">
-      Aucun train "${document.getElementById('searchInput').value}" actif dans le flux en ce moment
-      (il n'a peut-être pas de retard signalé actuellement, ou ne circule pas maintenant).
-    </div>`;
-  }
-
   html += `<table><thead><tr><th>Gare</th><th>N° Train</th><th>Retard</th></tr></thead><tbody>`;
 
   if (rows.length === 0) {
@@ -303,7 +302,46 @@ function renderListView(rows, area, wasTrainSearchWithNoResult) {
   area.innerHTML = html;
 }
 
-function renderTrainView(trainNumber, rows, area) {
+function gtfsTimeToUnix(hms, referenceDate) {
+  if (!hms) return null;
+  const parts = hms.split(':').map(Number);
+  const h = parts[0] || 0, m = parts[1] || 0, s = parts[2] || 0;
+  const d = new Date(referenceDate);
+  d.setHours(0, 0, 0, 0);
+  d.setSeconds(d.getSeconds() + h * 3600 + m * 60 + s);
+  return d.getTime() / 1000;
+}
+
+async function renderScheduledTrainView(trainNumber, area) {
+  area.innerHTML = `<div class="panel-title">Recherche de l'horaire du train ${trainNumber}…</div>`;
+  try {
+    const res = await fetch('/api/train?number=' + encodeURIComponent(trainNumber));
+    const data = await res.json();
+
+    if (!res.ok) {
+      area.innerHTML = `
+        <a class="back-link" onclick="document.getElementById('searchInput').value='';render();">← Retour</a>
+        <div class="panel-title">Train n° ${trainNumber}</div>
+        <div style="color:var(--text-dim);font-size:13px;">${data.error || 'Aucune information trouvée pour ce train.'}</div>`;
+      return;
+    }
+
+    const today = new Date();
+    const rows = data.stops.map(s => ({
+      tripId: trainNumber,
+      stopId: s.stopId,
+      seq: s.seq,
+      time: gtfsTimeToUnix(s.departureTime || s.arrivalTime, today),
+      delayMin: 0
+    }));
+
+    renderTrainView(trainNumber, rows, area, true);
+  } catch (err) {
+    area.innerHTML = `<div class="panel-title" style="color:var(--rail-bright);">Erreur : ${String(err.message || err)}</div>`;
+  }
+}
+
+function renderTrainView(trainNumber, rows, area, isScheduleOnly) {
   const sorted = rows.slice().sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
   const now = Date.now() / 1000;
 
@@ -336,6 +374,11 @@ function renderTrainView(trainNumber, rows, area) {
 
   let html = `<a class="back-link" onclick="document.getElementById('searchInput').value='';render();">← Retour à la liste des gares</a>`;
   html += `<div class="panel-title">Train n° ${trainNumber} — trajet en direct</div>`;
+  if (isScheduleOnly) {
+    html += `<div style="color:var(--text-dim);font-size:13px;margin-bottom:16px;">
+      Aucun retard signalé pour ce train actuellement — horaire théorique affiché (position estimée en supposant qu'il roule à l'heure).
+    </div>`;
+  }
   html += `<div id="map"></div>`;
   html += `<table><thead><tr><th>Gare</th><th>Heure</th><th>Retard</th></tr></thead><tbody>`;
 

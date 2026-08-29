@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/train.js": { "maxDuration": 30 },
+    "api/stations.js": { "maxDuration": 30 },
+    "api/trips.js": { "maxDuration": 30 }
+  }
+}
