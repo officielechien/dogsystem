@@ -15,47 +15,49 @@ export default async function handler(req, res) {
   }
 
   for (const prefix of PREFIXES_TO_TRY) {
-    const vehicleId = prefix + trainNumber;
-    try {
-      // 1) Vérifie que ce train existe bien sous cet identifiant.
-      const vehicleRes = await fetch(
-        `https://api.irail.be/vehicle/?id=${encodeURIComponent(vehicleId)}&format=json&lang=fr`,
-        { headers: { "User-Agent": USER_AGENT } }
-      );
-      if (!vehicleRes.ok) continue;
-      const vehicleData = await vehicleRes.json();
-      if (!vehicleData || vehicleData.error) continue;
+    const shortId = prefix + trainNumber;
+    const idsToTry = [shortId, "BE.NMBS." + shortId];
 
-      // 2) Récupère la composition physique pour ce même identifiant.
-      const compRes = await fetch(
-        `https://api.irail.be/composition/?id=${encodeURIComponent(vehicleId)}&format=json&lang=fr`,
-        { headers: { "User-Agent": USER_AGENT } }
-      );
-      if (!compRes.ok) continue;
-      const compData = await compRes.json();
+    for (const vehicleId of idsToTry) {
+      try {
+        const vehicleRes = await fetch(
+          `https://api.irail.be/vehicle/?id=${encodeURIComponent(vehicleId)}&format=json&lang=fr`,
+          { headers: { "User-Agent": USER_AGENT } }
+        );
+        if (!vehicleRes.ok) continue;
+        const vehicleData = await vehicleRes.json();
+        if (!vehicleData || vehicleData.error) continue;
 
-      const segments = compData?.composition?.segments?.segment || [];
-      const units = [];
-      segments.forEach(seg => {
-        const segUnits = seg?.composition?.units?.unit || [];
-        segUnits.forEach(u => {
-          units.push({
-            materialNumber: u.materialNumber,
-            type: u.materialType?.parent_type || null,
-            hasBikeSection: u.hasBikeSection === "1",
-            hasToilets: u.hasToilets === "1",
-            seatsFirstClass: parseInt(u.seatsFirstClass, 10) || 0,
-            seatsSecondClass: parseInt(u.seatsSecondClass, 10) || 0
+        const compRes = await fetch(
+          `https://api.irail.be/composition/?id=${encodeURIComponent(vehicleId)}&format=json&lang=fr`,
+          { headers: { "User-Agent": USER_AGENT } }
+        );
+        if (!compRes.ok) continue;
+        const compData = await compRes.json();
+
+        const segments = compData?.composition?.segments?.segment || [];
+        const units = [];
+        segments.forEach(seg => {
+          const segUnits = seg?.composition?.units?.unit || [];
+          segUnits.forEach(u => {
+            units.push({
+              materialNumber: u.materialNumber,
+              type: u.materialType?.parent_type || null,
+              hasBikeSection: u.hasBikeSection === "1",
+              hasToilets: u.hasToilets === "1",
+              seatsFirstClass: parseInt(u.seatsFirstClass, 10) || 0,
+              seatsSecondClass: parseInt(u.seatsSecondClass, 10) || 0
+            });
           });
         });
-      });
 
-      if (units.length > 0) {
-        res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
-        return res.status(200).json({ vehicleId, units });
+        if (units.length > 0) {
+          res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate");
+          return res.status(200).json({ vehicleId, units });
+        }
+      } catch (err) {
+        continue;
       }
-    } catch (err) {
-      continue; // on essaie le préfixe suivant
     }
   }
 

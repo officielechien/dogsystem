@@ -70,7 +70,8 @@
   .delay-warn{color:var(--warn);}
   .delay-bad{color:var(--rail-bright);}
 
-  #map{width:100%;height:360px;border-radius:6px;border:1px solid var(--line);margin-bottom:24px;filter:grayscale(0.15) contrast(1.05);}
+  #map{width:100%;height:360px;border-radius:6px;border:1px solid var(--line);margin-bottom:24px;background:#0a0a0b;}
+  #map .leaflet-tile-pane{filter:invert(92%) hue-rotate(180deg) brightness(0.95) contrast(0.9);}
 
   .composition-panel{background:var(--bg-panel);border:1px solid var(--line);border-radius:8px;padding:18px;margin-top:24px;}
   .composition-units{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
@@ -445,7 +446,7 @@ function renderTrainView(trainNumber, rows, area, isScheduleOnly) {
   if (coords.length === 0) return;
 
   leafletMap = L.map('map', { attributionControl: false });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19 }).addTo(leafletMap);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 19 }).addTo(leafletMap);
 
   L.polyline(coords, { color: '#b31217', weight: 3, opacity: 0.7 }).addTo(leafletMap);
 
