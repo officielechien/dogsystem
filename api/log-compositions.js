@@ -83,14 +83,14 @@ async function getActiveTrainNumbers(apiKey) {
 }
 
 async function fetchComposition(trainNumber) {
-  for (const prefix of PREFIXES_TO_TRY) {
+  const attempts = PREFIXES_TO_TRY.map(async prefix => {
     const vehicleId = prefix + trainNumber;
     try {
       const compRes = await fetch(
         `https://api.irail.be/composition/?id=${encodeURIComponent(vehicleId)}&format=json&lang=fr`,
         { headers: { "User-Agent": USER_AGENT } }
       );
-      if (!compRes.ok) continue;
+      if (!compRes.ok) return null;
       const compData = await compRes.json();
       const segments = compData?.composition?.segments?.segment || [];
       const materialNumbers = [];
@@ -98,12 +98,14 @@ async function fetchComposition(trainNumber) {
         const units = seg?.composition?.units?.unit || [];
         units.forEach(u => { if (u.materialNumber) materialNumbers.push(u.materialNumber); });
       });
-      if (materialNumbers.length > 0) return materialNumbers;
+      return materialNumbers.length > 0 ? materialNumbers : null;
     } catch (err) {
-      continue;
+      return null;
     }
-  }
-  return null;
+  });
+
+  const results = await Promise.all(attempts);
+  return results.find(r => r !== null) || null;
 }
 
 export default async function handler(req, res) {
@@ -113,12 +115,18 @@ export default async function handler(req, res) {
   try {
     const trainNumbers = await getActiveTrainNumbers(apiKey);
     const today = new Date().toISOString().slice(0, 10);
-    const records = [];
 
-    for (const number of trainNumbers) {
-      const units = await fetchComposition(number);
-      if (units) records.push({ trainNumber: number, units, time: Date.now() });
-    }
+    // On limite le nombre de trains traités par exécution pour rester dans le temps imparti.
+    const MAX_TRAINS_PER_RUN = 60;
+    const numbersToProcess = trainNumbers.slice(0, MAX_TRAINS_PER_RUN);
+
+    const results = await Promise.all(
+      numbersToProcess.map(async number => {
+        const units = await fetchComposition(number);
+        return units ? { trainNumber: number, units, time: Date.now() } : null;
+      })
+    );
+    const records = results.filter(Boolean);
 
     const key = `compositions:${today}`;
     const existing = (await kv.get(key)) || [];
