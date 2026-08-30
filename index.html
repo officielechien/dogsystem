@@ -43,6 +43,8 @@
   .hero-content{position:relative;z-index:2;text-align:center;max-width:720px;width:100%;}
   .eyebrow{font-family:'IBM Plex Mono',monospace;letter-spacing:.25em;text-transform:uppercase;font-size:12px;color:var(--rail-bright);margin-bottom:18px;}
   .title-row{display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;}
+  .signal-dot{width:10px;height:10px;border-radius:50%;background:var(--rail-bright);box-shadow:0 0 10px var(--rail-bright);animation:pulse 1.6s ease-in-out infinite;flex-shrink:0;}
+  .signal-dot.right{animation-delay:0.8s;}
   .train-wrap{display:inline-block;animation:trainBob 2.4s ease-in-out infinite;}
   .train-wrap.right{animation-delay:1.2s;}
   .train-svg{width:90px;height:auto;flex-shrink:0;display:block;}
@@ -164,37 +166,9 @@
   <div class="hero-content">
     <div class="eyebrow">Réseau ferroviaire belge · En direct</div>
     <div class="title-row">
-      <span class="train-wrap">
-        <svg class="train-svg" viewBox="0 0 140 90">
-          <path class="train-fill" d="M8 68 Q8 40 45 28 L100 28 Q125 28 130 55 L130 68 Z"/>
-          <path class="train-line" d="M8 68 Q8 40 45 28 L100 28 Q125 28 130 55 L130 68 Z"/>
-          <path class="train-line" d="M45 28 Q40 45 45 60 L88 60 Q92 45 88 28"/>
-          <path class="train-line" d="M66 28 L66 60"/>
-          <circle class="train-line" cx="115" cy="68" r="9"/>
-          <circle class="train-line" cx="60" cy="68" r="9"/>
-          <circle cx="115" cy="68" r="2.5" fill="var(--rail-bright)"/>
-          <circle cx="60" cy="68" r="2.5" fill="var(--rail-bright)"/>
-          <line class="train-line" x1="8" y1="68" x2="132" y2="68"/>
-          <line class="train-line" x1="100" y1="18" x2="100" y2="28"/>
-          <line class="train-line" x1="95" y1="14" x2="108" y2="14"/>
-        </svg>
-      </span>
+      <span class="signal-dot"></span>
       <h1>DOG<span>SYSTEM</span></h1>
-      <span class="train-wrap right">
-        <svg class="train-svg right" viewBox="0 0 140 90">
-          <path class="train-fill" d="M8 68 Q8 40 45 28 L100 28 Q125 28 130 55 L130 68 Z"/>
-          <path class="train-line" d="M8 68 Q8 40 45 28 L100 28 Q125 28 130 55 L130 68 Z"/>
-          <path class="train-line" d="M45 28 Q40 45 45 60 L88 60 Q92 45 88 28"/>
-          <path class="train-line" d="M66 28 L66 60"/>
-          <circle class="train-line" cx="115" cy="68" r="9"/>
-          <circle class="train-line" cx="60" cy="68" r="9"/>
-          <circle cx="115" cy="68" r="2.5" fill="var(--rail-bright)"/>
-          <circle cx="60" cy="68" r="2.5" fill="var(--rail-bright)"/>
-          <line class="train-line" x1="8" y1="68" x2="132" y2="68"/>
-          <line class="train-line" x1="100" y1="18" x2="100" y2="28"/>
-          <line class="train-line" x1="95" y1="14" x2="108" y2="14"/>
-        </svg>
-      </span>
+      <span class="signal-dot right"></span>
     </div>
     <p class="tagline"></p>
     <div class="search-bar">
