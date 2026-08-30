@@ -28,7 +28,9 @@
     padding:50px 24px;overflow:hidden;border-bottom:1px solid var(--line);
   }
   .rails-svg{position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:0.9;}
-  .rail-line{stroke:var(--rail);stroke-width:2;fill:none;filter:drop-shadow(0 0 6px rgba(179,18,23,0.45));}
+  .rail-line{stroke:var(--rail-bright);stroke-width:3;fill:none;filter:drop-shadow(0 0 8px rgba(255,59,59,0.6));}
+  .rail-tie{stroke:#5a1418;stroke-width:2;}
+  .blip{fill:var(--rail-bright);filter:drop-shadow(0 0 6px var(--rail-bright));}
   .hero-content{position:relative;z-index:2;text-align:center;max-width:720px;width:100%;}
   .eyebrow{font-family:'IBM Plex Mono',monospace;letter-spacing:.25em;text-transform:uppercase;font-size:12px;color:var(--rail-bright);margin-bottom:18px;}
   h1{font-family:'Oswald',sans-serif;font-weight:700;font-size:clamp(38px,8vw,72px);letter-spacing:.03em;margin:0 0 14px;line-height:0.95;text-transform:uppercase;}
@@ -95,15 +97,41 @@
 
 <section class="hero">
   <svg class="rails-svg" viewBox="0 0 1200 500" preserveAspectRatio="xMidYMid slice">
-    <path class="rail-line" d="M -100 560 L 560 200" />
-    <path class="rail-line" d="M -20 560 L 585 200" />
-    <path class="rail-line" d="M 1300 560 L 640 200" />
-    <path class="rail-line" d="M 1220 560 L 615 200" />
+    <g>
+      <path class="rail-line" d="M -100 560 L 560 200" />
+      <path class="rail-line" d="M -20 560 L 585 200" />
+      <path class="rail-line" d="M 1300 560 L 640 200" />
+      <path class="rail-line" d="M 1220 560 L 615 200" />
+    </g>
+    <g class="rail-tie">
+      <line x1="-70" y1="520" x2="10" y2="520"/>
+      <line x1="-40" y1="470" x2="30" y2="470"/>
+      <line x1="-10" y1="420" x2="55" y2="420"/>
+      <line x1="20" y1="370" x2="80" y2="370"/>
+      <line x1="50" y1="320" x2="105" y2="320"/>
+      <line x1="80" y1="270" x2="128" y2="270"/>
+      <line x1="110" y1="220" x2="150" y2="220"/>
+    </g>
+    <g class="rail-tie">
+      <line x1="1190" y1="520" x2="1270" y2="520"/>
+      <line x1="1160" y1="470" x2="1230" y2="470"/>
+      <line x1="1130" y1="420" x2="1195" y2="420"/>
+      <line x1="1100" y1="370" x2="1160" y2="370"/>
+      <line x1="1070" y1="320" x2="1125" y2="320"/>
+      <line x1="1040" y1="270" x2="1088" y2="270"/>
+      <line x1="1010" y1="220" x2="1050" y2="220"/>
+    </g>
+    <circle class="blip" r="4" cx="-20" cy="560">
+      <animateMotion dur="5s" repeatCount="indefinite" path="M -20 560 L 585 200" />
+    </circle>
+    <circle class="blip" r="4" cx="1220" cy="560">
+      <animateMotion dur="6.2s" repeatCount="indefinite" path="M 1220 560 L 615 200" />
+    </circle>
   </svg>
   <div class="hero-content">
     <div class="eyebrow"></div>
     <h1>DOG<span>SYSTEM</span></h1>
-    <p class="tagline">DOG SYSTEM BY WOUF</p>
+    <p class="tagline"></p>
     <div class="search-bar">
       <input type="text" id="searchInput" placeholder="Ex: 517, ou Bruxelles-Central…" />
     </div>
@@ -132,7 +160,7 @@
 
 </div>
 
-<footer>DOGSYSTEM · DONNÉES EN DIRECT : SNCB / BELGIAN MOBILITY COMPANY · POSITION ESTIMÉE À PARTIR DES HORAIRES, PAS DE GPS RÉEL</footer>
+<footer>DOG SYSTEM BY WOUF</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
