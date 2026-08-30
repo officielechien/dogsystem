@@ -42,6 +42,15 @@
   .skyline-line{stroke:var(--rail-bright);stroke-width:1.5;fill:none;}
   .hero-content{position:relative;z-index:2;text-align:center;max-width:720px;width:100%;}
   .eyebrow{font-family:'IBM Plex Mono',monospace;letter-spacing:.25em;text-transform:uppercase;font-size:12px;color:var(--rail-bright);margin-bottom:18px;}
+  .title-row{display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;}
+  .train-wrap{display:inline-block;animation:trainBob 2.4s ease-in-out infinite;}
+  .train-wrap.right{animation-delay:1.2s;}
+  .train-svg{width:90px;height:auto;flex-shrink:0;display:block;}
+  .train-svg.right{transform:scaleX(-1);}
+  @keyframes trainBob{0%,100%{transform:translateY(0);}50%{transform:translateY(-4px);}}
+  .train-line{stroke:var(--rail-bright);stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+  .train-fill{fill:var(--rail-bright);opacity:0.15;}
+  @media (max-width: 640px){.train-svg{display:none;}}
   h1{font-family:'Oswald',sans-serif;font-weight:700;font-size:clamp(38px,8vw,72px);letter-spacing:.03em;margin:0 0 14px;line-height:0.95;text-transform:uppercase;}
   h1 span{color:var(--rail-bright);}
   .tagline{color:var(--text-dim);font-size:16px;margin:0 0 30px;line-height:1.5;}
@@ -154,7 +163,39 @@
 
   <div class="hero-content">
     <div class="eyebrow">Réseau ferroviaire belge · En direct</div>
-    <h1>DOG<span>SYSTEM</span></h1>
+    <div class="title-row">
+      <span class="train-wrap">
+        <svg class="train-svg" viewBox="0 0 140 90">
+          <path class="train-fill" d="M8 68 Q8 40 45 28 L100 28 Q125 28 130 55 L130 68 Z"/>
+          <path class="train-line" d="M8 68 Q8 40 45 28 L100 28 Q125 28 130 55 L130 68 Z"/>
+          <path class="train-line" d="M45 28 Q40 45 45 60 L88 60 Q92 45 88 28"/>
+          <path class="train-line" d="M66 28 L66 60"/>
+          <circle class="train-line" cx="115" cy="68" r="9"/>
+          <circle class="train-line" cx="60" cy="68" r="9"/>
+          <circle cx="115" cy="68" r="2.5" fill="var(--rail-bright)"/>
+          <circle cx="60" cy="68" r="2.5" fill="var(--rail-bright)"/>
+          <line class="train-line" x1="8" y1="68" x2="132" y2="68"/>
+          <line class="train-line" x1="100" y1="18" x2="100" y2="28"/>
+          <line class="train-line" x1="95" y1="14" x2="108" y2="14"/>
+        </svg>
+      </span>
+      <h1>DOG<span>SYSTEM</span></h1>
+      <span class="train-wrap right">
+        <svg class="train-svg right" viewBox="0 0 140 90">
+          <path class="train-fill" d="M8 68 Q8 40 45 28 L100 28 Q125 28 130 55 L130 68 Z"/>
+          <path class="train-line" d="M8 68 Q8 40 45 28 L100 28 Q125 28 130 55 L130 68 Z"/>
+          <path class="train-line" d="M45 28 Q40 45 45 60 L88 60 Q92 45 88 28"/>
+          <path class="train-line" d="M66 28 L66 60"/>
+          <circle class="train-line" cx="115" cy="68" r="9"/>
+          <circle class="train-line" cx="60" cy="68" r="9"/>
+          <circle cx="115" cy="68" r="2.5" fill="var(--rail-bright)"/>
+          <circle cx="60" cy="68" r="2.5" fill="var(--rail-bright)"/>
+          <line class="train-line" x1="8" y1="68" x2="132" y2="68"/>
+          <line class="train-line" x1="100" y1="18" x2="100" y2="28"/>
+          <line class="train-line" x1="95" y1="14" x2="108" y2="14"/>
+        </svg>
+      </span>
+    </div>
     <p class="tagline"></p>
     <div class="search-bar">
       <input type="text" id="searchInput" placeholder="Ex: 517, ou Bruxelles-Central…" />
@@ -168,7 +209,7 @@
     <div class="status-left">
       <span class="dot loading" id="statusDot"></span>
       <div>
-        <div class="status-title" id="statusTitle">Connexion à l'API SNCB…</div>
+        <div class="status-title" id="statusTitle">Chargement…</div>
         <div class="status-sub" id="statusSub">—</div>
       </div>
     </div>
@@ -287,8 +328,8 @@ async function loadTripUpdates() {
     });
 
     dot.className = 'dot ok';
-    title.textContent = 'Connecté — flux en direct';
-    sub.textContent = 'Dernière mise à jour : ' + new Date().toLocaleTimeString('fr-BE');
+    title.textContent = 'En direct';
+    sub.textContent = 'Mis à jour : ' + new Date().toLocaleTimeString('fr-BE');
 
     render();
   } catch (err) {
