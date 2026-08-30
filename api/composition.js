@@ -5,7 +5,7 @@
 // iRail identifie les trains avec un préfixe de catégorie + le numéro (ex: "IC537", "S51507").
 // Comme on ne connaît que le numéro nu, on essaie les préfixes les plus courants un par un.
 
-const PREFIXES_TO_TRY = ["IC", "S", "L", "P", "EXTRA", "ICE", "THA", "EUR"];
+const PREFIXES_TO_TRY = ["IC", "S", "L", "P", "EXTRA", "ICE", "THA", "EUR", "IZY", "ICT", "CR", ""];
 const USER_AGENT = "DOGSYSTEM/1.0 (dogsystem.vercel.app)";
 
 export default async function handler(req, res) {
@@ -62,6 +62,6 @@ export default async function handler(req, res) {
   }
 
   return res.status(404).json({
-    error: `Composition introuvable pour le train ${trainNumber} (essayé avec les préfixes ${PREFIXES_TO_TRY.join(", ")}).`
+    error: `Composition non disponible pour ce train pour le moment.`
   });
 }
