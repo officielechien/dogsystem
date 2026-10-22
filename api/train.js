@@ -7,6 +7,7 @@ import JSZip from "jszip";
 
 let staticZipCache = { zip: null, timestamp: 0 };
 const CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 heures
+const resultCache = new Map(); // numéro -> { data, timestamp }
 
 async function getStaticZip(apiKey) {
   const now = Date.now();
@@ -56,6 +57,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Paramètre 'number' manquant." });
   }
 
+  const cached = resultCache.get(trainNumber);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate");
+    return res.status(200).json(cached.data);
+  }
+
   try {
     const zip = await getStaticZip(apiKey);
 
@@ -76,6 +83,7 @@ export default async function handler(req, res) {
     const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const candidateTripIds = [];
     for (let i = 1; i < tripsLines.length; i++) {
+      if (tripsLines[i].indexOf(trainNumber) === -1) continue; // filtre rapide avant le vrai parsing
       const cols = parseCsvLine(tripsLines[i]);
       if (cols[shortNameIdx] === trainNumber) {
         candidateTripIds.push(cols[tripIdIdx]);
@@ -121,7 +129,10 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: `Horaire introuvable pour le train "${trainNumber}".` });
     }
 
-    return res.status(200).json({ tripId: chosenTripId, trainNumber, stops });
+    const result = { tripId: chosenTripId, trainNumber, stops };
+    resultCache.set(trainNumber, { data: result, timestamp: Date.now() });
+    res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate");
+    return res.status(200).json(result);
   } catch (err) {
     return res.status(500).json({ error: "Impossible de charger l'horaire.", details: String(err) });
   }
